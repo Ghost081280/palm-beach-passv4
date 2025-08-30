@@ -213,6 +213,39 @@ class PalmBeachPassApp {
                 image: '🎨',
                 gradient: 'linear-gradient(135deg, #4B0082, #8A2BE2)',
                 featured: false
+            },
+            {
+                id: 'lion-country-safari',
+                name: 'Lion Country Safari',
+                category: 'family',
+                description: 'Drive-through safari adventure featuring over 1,000 animals roaming freely across 320 acres.',
+                regularPrice: 39.95,
+                coordinates: { lat: 26.6700, lng: -80.1800 },
+                image: '🦁',
+                gradient: 'linear-gradient(135deg, #8B4513, #DEB887)',
+                featured: true
+            },
+            {
+                id: 'mounts-botanical-garden',
+                name: 'Mounts Botanical Garden',
+                category: 'nature',
+                description: 'Tropical paradise featuring the largest botanical garden in Palm Beach County.',
+                regularPrice: 10,
+                coordinates: { lat: 26.6400, lng: -80.0900 },
+                image: '🌺',
+                gradient: 'linear-gradient(135deg, #32CD32, #98FB98)',
+                featured: false
+            },
+            {
+                id: 'rapids-water-park',
+                name: 'Rapids Water Park',
+                category: 'family',
+                description: 'South Florida\'s premier water park featuring thrilling slides, lazy river, and wave pool.',
+                regularPrice: 34.99,
+                coordinates: { lat: 26.6300, lng: -80.1200 },
+                image: '💦',
+                gradient: 'linear-gradient(135deg, #00BFFF, #1E90FF)',
+                featured: true
             }
         ];
     }
@@ -316,6 +349,11 @@ class PalmBeachPassApp {
         
         // Update cart badge
         this.updateCartBadge();
+        
+        // Initialize map after a short delay
+        setTimeout(() => {
+            this.initializeMap();
+        }, 1000);
     }
 
     renderPasses() {
@@ -365,7 +403,7 @@ class PalmBeachPassApp {
                 <div class="attraction-info">
                     <h3>${attraction.name}</h3>
                     <div class="price-row">
-                        ${attraction.regularPrice > 0 ? `<span class="regular-price">Regular ${attraction.regularPrice}</span>` : ''}
+                        ${attraction.regularPrice > 0 ? `<span class="regular-price">Regular $${attraction.regularPrice}</span>` : ''}
                         <span style="color: var(--success); font-weight: 600;">FREE with pass</span>
                     </div>
                     <p class="attraction-desc">${attraction.description}</p>
@@ -388,7 +426,7 @@ class PalmBeachPassApp {
 
     // Map Functions
     initializeMap() {
-        console.log('Initializing Google Maps...');
+        console.log('Initializing map...');
         
         const mapContainer = document.getElementById('map');
         if (!mapContainer) {
@@ -397,6 +435,13 @@ class PalmBeachPassApp {
         }
 
         try {
+            // Check if Google Maps is available (mock or real)
+            if (typeof google === 'undefined' || !google.maps) {
+                console.log('Google Maps not available, showing fallback');
+                this.handleMapLoadError();
+                return;
+            }
+
             // Center map on Palm Beach County
             const palmBeachCenter = { lat: 26.7000, lng: -80.0500 };
             
@@ -445,37 +490,48 @@ class PalmBeachPassApp {
         if (!this.state.map) return;
 
         // Clear existing markers
-        this.state.markers.forEach(marker => marker.setMap(null));
+        this.state.markers.forEach(marker => {
+            if (marker.setMap) marker.setMap(null);
+        });
         this.state.markers = [];
 
         this.state.attractions.forEach(attraction => {
             if (!attraction.coordinates) return;
 
-            const marker = new google.maps.Marker({
-                position: attraction.coordinates,
-                map: this.state.map,
-                title: attraction.name,
-                icon: this.createCustomMarker(attraction.category),
-                animation: google.maps.Animation.DROP
-            });
-
-            const infoWindow = new google.maps.InfoWindow({
-                content: this.createInfoWindowContent(attraction)
-            });
-
-            marker.addListener('click', () => {
-                // Close other info windows
-                this.state.markers.forEach(m => {
-                    if (m.infoWindow) m.infoWindow.close();
+            try {
+                const marker = new google.maps.Marker({
+                    position: attraction.coordinates,
+                    map: this.state.map,
+                    title: attraction.name,
+                    icon: this.createCustomMarker(attraction.category),
+                    animation: google.maps.Animation.DROP,
+                    category: attraction.category
                 });
-                
-                infoWindow.open(this.state.map, marker);
-            });
 
-            marker.infoWindow = infoWindow;
-            marker.attractionData = attraction;
-            this.state.markers.push(marker);
+                const infoWindow = new google.maps.InfoWindow({
+                    content: this.createInfoWindowContent(attraction)
+                });
+
+                marker.addListener('click', () => {
+                    // Close other info windows
+                    this.state.markers.forEach(m => {
+                        if (m.infoWindow && m.infoWindow.close) {
+                            m.infoWindow.close();
+                        }
+                    });
+                    
+                    infoWindow.open(this.state.map, marker);
+                });
+
+                marker.infoWindow = infoWindow;
+                marker.attractionData = attraction;
+                this.state.markers.push(marker);
+            } catch (error) {
+                console.error('Failed to create marker for:', attraction.name, error);
+            }
         });
+
+        console.log(`Created ${this.state.markers.length} attraction markers`);
     }
 
     createCustomMarker(category) {
@@ -489,19 +545,30 @@ class PalmBeachPassApp {
         };
 
         const color = colors[category] || '#2D5016';
+        const icon = this.getCategoryIcon(category);
         
-        return {
-            url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="20" cy="20" r="18" fill="${color}" stroke="white" stroke-width="3"/>
-                    <text x="20" y="25" text-anchor="middle" fill="white" font-size="16" font-weight="bold">
-                        ${this.getCategoryIcon(category)}
-                    </text>
-                </svg>
-            `)}`,
-            scaledSize: new google.maps.Size(40, 40),
-            anchor: new google.maps.Point(20, 20)
-        };
+        // For mock Google Maps, return simple object
+        if (window.google && window.google.maps && window.google.maps.Size) {
+            return {
+                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="20" cy="20" r="18" fill="${color}" stroke="white" stroke-width="3"/>
+                        <text x="20" y="26" text-anchor="middle" fill="white" font-size="14" font-weight="bold">
+                            ${icon}
+                        </text>
+                    </svg>
+                `)}`,
+                scaledSize: new google.maps.Size(40, 40),
+                anchor: new google.maps.Point(20, 20)
+            };
+        } else {
+            // For mock implementation, return simple object
+            return {
+                emoji: icon,
+                color: color,
+                category: category
+            };
+        }
     }
 
     createInfoWindowContent(attraction) {
@@ -514,7 +581,7 @@ class PalmBeachPassApp {
                 <div class="info-window-body">
                     <div class="info-window-description">${attraction.description}</div>
                     <div class="info-window-price">
-                        ${attraction.regularPrice > 0 ? `<span class="info-window-regular">Regular ${attraction.regularPrice}</span>` : ''}
+                        ${attraction.regularPrice > 0 ? `<span class="info-window-regular">Regular $${attraction.regularPrice}</span>` : ''}
                         <span class="info-window-free">FREE with Pass</span>
                     </div>
                 </div>
@@ -532,7 +599,8 @@ class PalmBeachPassApp {
         document.querySelectorAll('.filter-tab').forEach(tab => {
             tab.classList.remove('active');
         });
-        document.querySelector(`[data-category="${category}"]`).classList.add('active');
+        const activeTab = document.querySelector(`[data-category="${category}"]`);
+        if (activeTab) activeTab.classList.add('active');
 
         this.state.currentFilter = category;
 
@@ -540,18 +608,27 @@ class PalmBeachPassApp {
         this.state.markers.forEach(marker => {
             const attraction = marker.attractionData;
             if (category === 'all' || attraction.category === category) {
-                marker.setVisible(true);
-                if (marker.getAnimation() !== google.maps.Animation.DROP) {
-                    marker.setAnimation(google.maps.Animation.BOUNCE);
-                    setTimeout(() => marker.setAnimation(null), 1000);
+                if (marker.setVisible) {
+                    marker.setVisible(true);
+                }
+                if (marker.setAnimation && google.maps.Animation) {
+                    if (marker.getAnimation() !== google.maps.Animation.DROP) {
+                        marker.setAnimation(google.maps.Animation.BOUNCE);
+                        setTimeout(() => marker.setAnimation(null), 1000);
+                    }
                 }
             } else {
-                marker.setVisible(false);
-                if (marker.infoWindow) marker.infoWindow.close();
+                if (marker.setVisible) {
+                    marker.setVisible(false);
+                }
+                if (marker.infoWindow && marker.infoWindow.close) {
+                    marker.infoWindow.close();
+                }
             }
         });
 
-        this.showToast(`Showing ${category === 'all' ? 'all' : category} attractions`, 'info');
+        const categoryName = category === 'all' ? 'all' : category;
+        this.showToast(`Showing ${categoryName} attractions`, 'info');
     }
 
     handleMapLoadError() {
@@ -747,7 +824,7 @@ class PalmBeachPassApp {
         }
 
         const item = this.state.cart[0];
-        this.showToast(`Cart: ${item.name} - ${item.adultPrice}`, 'info');
+        this.showToast(`Cart: ${item.name} - $${item.adultPrice}`, 'info');
         
         setTimeout(() => {
             window.location.href = 'checkout.html';
@@ -759,7 +836,8 @@ class PalmBeachPassApp {
         const attraction = this.state.attractions.find(a => a.id === attractionId);
         if (!attraction) return;
 
-        const message = `🎫 ${attraction.name} | Regular: ${attraction.regularPrice || 0} | FREE with Palm Beach Pass! | ${attraction.description}`;
+        const priceText = attraction.regularPrice > 0 ? `Regular: $${attraction.regularPrice}` : '';
+        const message = `🎫 ${attraction.name} | ${priceText} | FREE with Palm Beach Pass! | ${attraction.description}`;
         this.showToast(message, 'info');
     }
 
