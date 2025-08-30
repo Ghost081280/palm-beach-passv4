@@ -341,6 +341,13 @@
             align-items: center;
             justify-content: center;
             font-size: 3rem;
+            overflow: hidden;
+        }
+
+        .qr-preview canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }
 
         .btn-view-passes {
@@ -401,7 +408,6 @@
             }
         }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js"></script>
 </head>
 <body>
     <!-- Header -->
@@ -607,7 +613,7 @@
                     Confirmation sent to <span id="confirmationEmail">your email</span>
                 </div>
                 <div class="qr-preview" id="qrPreview">
-                    <canvas id="qrCanvas" width="100" height="100"></canvas>
+                    <canvas id="qrCanvas" width="130" height="130"></canvas>
                 </div>
                 <div style="font-size: 0.8rem; color: var(--text-light);">
                     Your QR code is ready to use!
@@ -622,6 +628,69 @@
     </div>
 
     <script>
+        // Mock QR Code generation for demo
+        function generateMockQRCode(canvas, data) {
+            const ctx = canvas.getContext('2d');
+            const size = canvas.width;
+            const cellSize = size / 25; // 25x25 grid for QR-like pattern
+            
+            // Clear canvas
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Create QR-like pattern
+            ctx.fillStyle = '#2D5016';
+            
+            // Generate deterministic pattern based on data
+            const hash = data.split('').reduce((a, b) => {
+                a = ((a << 5) - a) + b.charCodeAt(0);
+                return a & a;
+            }, 0);
+            
+            let seed = Math.abs(hash);
+            function random() {
+                seed = (seed * 9301 + 49297) % 233280;
+                return seed / 233280;
+            }
+            
+            // Draw pattern
+            for (let i = 0; i < 25; i++) {
+                for (let j = 0; j < 25; j++) {
+                    if (random() > 0.5) {
+                        ctx.fillRect(i * cellSize, j * cellSize, cellSize, cellSize);
+                    }
+                }
+            }
+            
+            // Draw corner markers (QR code style)
+            const cornerSize = cellSize * 7;
+            
+            // Top-left corner
+            ctx.fillRect(0, 0, cornerSize, cornerSize);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(cellSize, cellSize, cornerSize - 2 * cellSize, cornerSize - 2 * cellSize);
+            ctx.fillStyle = '#2D5016';
+            ctx.fillRect(cellSize * 2, cellSize * 2, cornerSize - 4 * cellSize, cornerSize - 4 * cellSize);
+            
+            // Top-right corner
+            ctx.fillStyle = '#2D5016';
+            ctx.fillRect(size - cornerSize, 0, cornerSize, cornerSize);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(size - cornerSize + cellSize, cellSize, cornerSize - 2 * cellSize, cornerSize - 2 * cellSize);
+            ctx.fillStyle = '#2D5016';
+            ctx.fillRect(size - cornerSize + cellSize * 2, cellSize * 2, cornerSize - 4 * cellSize, cornerSize - 4 * cellSize);
+            
+            // Bottom-left corner
+            ctx.fillStyle = '#2D5016';
+            ctx.fillRect(0, size - cornerSize, cornerSize, cornerSize);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(cellSize, size - cornerSize + cellSize, cornerSize - 2 * cellSize, cornerSize - 2 * cellSize);
+            ctx.fillStyle = '#2D5016';
+            ctx.fillRect(cellSize * 2, size - cornerSize + cellSize * 2, cornerSize - 4 * cellSize, cornerSize - 4 * cellSize);
+            
+            return Promise.resolve();
+        }
+
         class CheckoutApp {
             constructor() {
                 this.state = {
@@ -937,16 +1006,20 @@
                         timestamp: Date.now()
                     };
 
-                    await QRCode.toCanvas(canvas, JSON.stringify(qrData), {
-                        width: 100,
-                        margin: 1,
-                        color: {
-                            dark: '#2D5016',
-                            light: '#FFFFFF'
-                        }
-                    });
+                    // Use mock QR code generation for demo
+                    await generateMockQRCode(canvas, JSON.stringify(qrData));
+                    console.log('QR Code generated successfully for demo');
                 } catch (error) {
                     console.error('Failed to generate QR code:', error);
+                    // Fallback: show placeholder
+                    const canvas = document.getElementById('qrCanvas');
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#f0f0f0';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#2D5016';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('QR CODE', canvas.width / 2, canvas.height / 2);
                 }
             }
 
