@@ -449,15 +449,17 @@ class PalmBeachPassApp {
                 zoom: 11,
                 center: palmBeachCenter,
                 styles: this.getMapStyles(),
-                disableDefaultUI: false,
-                zoomControl: true,
+                disableDefaultUI: true,
+                zoomControl: false,
                 mapTypeControl: false,
                 streetViewControl: false,
-                fullscreenControl: true
+                fullscreenControl: false
             });
 
-            // Add attraction markers
-            this.addAttractionMarkers();
+            // Add attraction markers with a small delay for better UX
+            setTimeout(() => {
+                this.addAttractionMarkers();
+            }, 500);
             
             console.log('Map initialized successfully');
         } catch (error) {
@@ -499,11 +501,13 @@ class PalmBeachPassApp {
             if (!attraction.coordinates) return;
 
             try {
+                const markerIcon = this.createCustomMarker(attraction.category);
+                
                 const marker = new google.maps.Marker({
                     position: attraction.coordinates,
                     map: this.state.map,
                     title: attraction.name,
-                    icon: this.createCustomMarker(attraction.category),
+                    icon: markerIcon,
                     animation: google.maps.Animation.DROP,
                     category: attraction.category
                 });
@@ -547,28 +551,12 @@ class PalmBeachPassApp {
         const color = colors[category] || '#2D5016';
         const icon = this.getCategoryIcon(category);
         
-        // For mock Google Maps, return simple object
-        if (window.google && window.google.maps && window.google.maps.Size) {
-            return {
-                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="20" cy="20" r="18" fill="${color}" stroke="white" stroke-width="3"/>
-                        <text x="20" y="26" text-anchor="middle" fill="white" font-size="14" font-weight="bold">
-                            ${icon}
-                        </text>
-                    </svg>
-                `)}`,
-                scaledSize: new google.maps.Size(40, 40),
-                anchor: new google.maps.Point(20, 20)
-            };
-        } else {
-            // For mock implementation, return simple object
-            return {
-                emoji: icon,
-                color: color,
-                category: category
-            };
-        }
+        // Return simple object for mock implementation
+        return {
+            emoji: icon,
+            color: color,
+            category: category
+        };
     }
 
     createInfoWindowContent(attraction) {
@@ -607,23 +595,21 @@ class PalmBeachPassApp {
         // Filter markers
         this.state.markers.forEach(marker => {
             const attraction = marker.attractionData;
-            if (category === 'all' || attraction.category === category) {
-                if (marker.setVisible) {
-                    marker.setVisible(true);
-                }
-                if (marker.setAnimation && google.maps.Animation) {
-                    if (marker.getAnimation() !== google.maps.Animation.DROP) {
-                        marker.setAnimation(google.maps.Animation.BOUNCE);
-                        setTimeout(() => marker.setAnimation(null), 1000);
-                    }
-                }
-            } else {
-                if (marker.setVisible) {
-                    marker.setVisible(false);
-                }
-                if (marker.infoWindow && marker.infoWindow.close) {
-                    marker.infoWindow.close();
-                }
+            const shouldShow = category === 'all' || attraction.category === category;
+            
+            if (marker.setVisible) {
+                marker.setVisible(shouldShow);
+            }
+            
+            if (shouldShow && marker.setAnimation && google.maps.Animation) {
+                marker.setAnimation(google.maps.Animation.BOUNCE);
+                setTimeout(() => {
+                    if (marker.setAnimation) marker.setAnimation(null);
+                }, 600);
+            }
+            
+            if (!shouldShow && marker.infoWindow && marker.infoWindow.close) {
+                marker.infoWindow.close();
             }
         });
 
