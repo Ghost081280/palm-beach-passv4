@@ -253,15 +253,235 @@
     <!-- Scripts -->
     <script src="app.js"></script>
     <script>
-        // Google Maps API callback
+        // Initialize mock Google Maps for demo
         function initMap() {
-            window.AppInstance.initializeMap();
+            if (window.AppInstance && window.AppInstance.initializeMap) {
+                window.AppInstance.initializeMap();
+            } else {
+                console.log('Google Maps initialized, waiting for app instance...');
+                setTimeout(() => {
+                    if (window.AppInstance && window.AppInstance.initializeMap) {
+                        window.AppInstance.initializeMap();
+                    }
+                }, 1000);
+            }
         }
-    </script>
-    <!-- Google Maps API - Replace YOUR_API_KEY with actual key -->
-    <script async defer 
-        src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap"
-        onerror="handleMapLoadError()">
+        
+        // Mock Google Maps API for demo purposes
+        function loadMockGoogleMaps() {
+            console.log('Loading mock Google Maps for demo...');
+            
+            // Create mock google.maps namespace
+            window.google = window.google || {};
+            window.google.maps = {
+                Map: function(element, options) {
+                    console.log('Mock Google Maps initialized');
+                    this.element = element;
+                    this.options = options;
+                    
+                    // Create a visual map placeholder
+                    element.innerHTML = `
+                        <div style="width: 100%; height: 100%; background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%); position: relative; border-radius: 10px; overflow: hidden;">
+                            <div style="position: absolute; top: 20px; left: 20px; color: white; font-weight: bold; font-size: 18px;">
+                                🗺️ Palm Beach County Interactive Map
+                            </div>
+                            <div style="position: absolute; bottom: 20px; right: 20px; color: rgba(255,255,255,0.8); font-size: 12px;">
+                                Demo Mode - Attractions shown below
+                            </div>
+                            <div id="mockMarkers" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></div>
+                        </div>
+                    `;
+                    
+                    setTimeout(() => {
+                        initMap();
+                    }, 100);
+                    
+                    return this;
+                },
+                
+                Marker: function(options) {
+                    this.options = options;
+                    this.visible = true;
+                    this.listeners = {};
+                    
+                    // Create visual marker
+                    const mockMarkers = document.getElementById('mockMarkers');
+                    if (mockMarkers) {
+                        const marker = document.createElement('div');
+                        marker.style.cssText = `
+                            position: absolute;
+                            width: 30px;
+                            height: 30px;
+                            background: ${this.getMarkerColor(options.category)};
+                            border: 2px solid white;
+                            border-radius: 50%;
+                            cursor: pointer;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 14px;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                            transition: all 0.3s;
+                            left: ${Math.random() * 85 + 5}%;
+                            top: ${Math.random() * 70 + 15}%;
+                        `;
+                        marker.innerHTML = options.icon?.emoji || '📍';
+                        marker.title = options.title;
+                        
+                        marker.addEventListener('click', () => {
+                            if (this.listeners.click) {
+                                this.listeners.click.forEach(callback => callback());
+                            }
+                        });
+                        
+                        marker.addEventListener('mouseenter', () => {
+                            marker.style.transform = 'scale(1.2)';
+                            marker.style.zIndex = '10';
+                        });
+                        
+                        marker.addEventListener('mouseleave', () => {
+                            marker.style.transform = 'scale(1)';
+                            marker.style.zIndex = '1';
+                        });
+                        
+                        mockMarkers.appendChild(marker);
+                        this.element = marker;
+                    }
+                    
+                    return this;
+                },
+                
+                InfoWindow: function(options) {
+                    this.options = options;
+                    this.isOpen = false;
+                    
+                    this.open = (map, marker) => {
+                        // Close other info windows first
+                        document.querySelectorAll('.mock-info-window').forEach(w => w.remove());
+                        
+                        const infoWindow = document.createElement('div');
+                        infoWindow.className = 'mock-info-window';
+                        infoWindow.style.cssText = `
+                            position: absolute;
+                            background: white;
+                            border-radius: 8px;
+                            padding: 15px;
+                            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+                            max-width: 250px;
+                            z-index: 1000;
+                            border: 1px solid #e0e0e0;
+                            font-size: 14px;
+                            left: ${marker.element.offsetLeft + 35}px;
+                            top: ${marker.element.offsetTop}px;
+                        `;
+                        infoWindow.innerHTML = this.options.content;
+                        
+                        const closeBtn = document.createElement('button');
+                        closeBtn.innerHTML = '×';
+                        closeBtn.style.cssText = `
+                            position: absolute;
+                            top: 5px;
+                            right: 8px;
+                            background: none;
+                            border: none;
+                            font-size: 18px;
+                            cursor: pointer;
+                            color: #666;
+                        `;
+                        closeBtn.onclick = () => infoWindow.remove();
+                        infoWindow.appendChild(closeBtn);
+                        
+                        document.getElementById('mockMarkers').appendChild(infoWindow);
+                        this.isOpen = true;
+                    };
+                    
+                    this.close = () => {
+                        document.querySelectorAll('.mock-info-window').forEach(w => w.remove());
+                        this.isOpen = false;
+                    };
+                    
+                    return this;
+                },
+                
+                Animation: {
+                    DROP: 'drop',
+                    BOUNCE: 'bounce'
+                },
+                
+                Size: function(width, height) {
+                    return { width, height };
+                },
+                
+                Point: function(x, y) {
+                    return { x, y };
+                }
+            };
+            
+            // Add marker color helper to prototype
+            window.google.maps.Marker.prototype.getMarkerColor = function(category) {
+                const colors = {
+                    shopping: '#FFD700',
+                    culture: '#8A2BE2', 
+                    family: '#90EE90',
+                    nature: '#20B2AA',
+                    dining: '#DAA520',
+                    adventure: '#FF6B6B'
+                };
+                return colors[category] || '#2D5016';
+            };
+            
+            window.google.maps.Marker.prototype.addListener = function(event, callback) {
+                if (!this.listeners[event]) this.listeners[event] = [];
+                this.listeners[event].push(callback);
+            };
+            
+            window.google.maps.Marker.prototype.setMap = function(map) {
+                // Mock setMap functionality
+            };
+            
+            window.google.maps.Marker.prototype.setVisible = function(visible) {
+                this.visible = visible;
+                if (this.element) {
+                    this.element.style.display = visible ? 'flex' : 'none';
+                }
+            };
+            
+            window.google.maps.Marker.prototype.setAnimation = function(animation) {
+                if (this.element && animation === 'bounce') {
+                    this.element.style.animation = 'bounce 1s ease';
+                    setTimeout(() => {
+                        if (this.element) this.element.style.animation = '';
+                    }, 1000);
+                }
+            };
+            
+            window.google.maps.Marker.prototype.getAnimation = function() {
+                return this.element?.style.animation ? 'bounce' : null;
+            };
+            
+            // Add bounce animation CSS
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes bounce {
+                    0%, 20%, 60%, 100% { transform: translateY(0) scale(1); }
+                    40% { transform: translateY(-10px) scale(1.1); }
+                    80% { transform: translateY(-5px) scale(1.05); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        // Load mock maps immediately
+        loadMockGoogleMaps();
+        
+        // Initialize the map when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                if (window.google && window.google.maps) {
+                    initMap();
+                }
+            }, 500);
+        });
     </script>
 </body>
 </html>
