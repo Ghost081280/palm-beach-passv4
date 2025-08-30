@@ -278,15 +278,32 @@
                     console.log('Mock Google Maps initialized');
                     this.element = element;
                     this.options = options;
+                    this.markers = [];
                     
-                    // Create a visual map placeholder
+                    // Create a visual map placeholder with better styling
                     element.innerHTML = `
-                        <div style="width: 100%; height: 100%; background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%); position: relative; border-radius: 10px; overflow: hidden;">
-                            <div style="position: absolute; top: 20px; left: 20px; color: white; font-weight: bold; font-size: 18px;">
+                        <div style="width: 100%; height: 100%; background: linear-gradient(135deg, #e8f5e8 0%, #f0f8f0 100%); position: relative; border-radius: 10px; overflow: hidden; border: 2px solid #2D5016;">
+                            <!-- Map grid pattern -->
+                            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.1; background-image: repeating-linear-gradient(0deg, #2D5016, #2D5016 1px, transparent 1px, transparent 20px), repeating-linear-gradient(90deg, #2D5016, #2D5016 1px, transparent 1px, transparent 20px);"></div>
+                            
+                            <!-- Water areas (blue spots) -->
+                            <div style="position: absolute; top: 20%; left: 15%; width: 80px; height: 60px; background: #4A90E2; border-radius: 30px; opacity: 0.6;"></div>
+                            <div style="position: absolute; top: 60%; right: 20%; width: 120px; height: 40px; background: #357ABD; border-radius: 20px; opacity: 0.6;"></div>
+                            <div style="position: absolute; bottom: 25%; left: 25%; width: 60px; height: 60px; background: #4A90E2; border-radius: 50%; opacity: 0.6;"></div>
+                            
+                            <!-- Park areas (green spots) -->
+                            <div style="position: absolute; top: 40%; left: 40%; width: 100px; height: 80px; background: #90EE90; border-radius: 15px; opacity: 0.4;"></div>
+                            <div style="position: absolute; top: 15%; right: 30%; width: 70px; height: 70px; background: #90EE90; border-radius: 10px; opacity: 0.4;"></div>
+                            
+                            <!-- Road lines -->
+                            <div style="position: absolute; top: 30%; left: 0; width: 100%; height: 2px; background: #666; opacity: 0.3;"></div>
+                            <div style="position: absolute; top: 0; left: 60%; width: 2px; height: 100%; background: #666; opacity: 0.3;"></div>
+                            
+                            <div style="position: absolute; top: 20px; left: 20px; color: #2D5016; font-weight: bold; font-size: 18px; text-shadow: 0 1px 3px rgba(255,255,255,0.8);">
                                 🗺️ Palm Beach County Interactive Map
                             </div>
-                            <div style="position: absolute; bottom: 20px; right: 20px; color: rgba(255,255,255,0.8); font-size: 12px;">
-                                Demo Mode - Attractions shown below
+                            <div style="position: absolute; bottom: 20px; right: 20px; color: #666; font-size: 12px; background: rgba(255,255,255,0.8); padding: 5px 10px; border-radius: 15px;">
+                                Demo Mode - Click markers for details
                             </div>
                             <div id="mockMarkers" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></div>
                         </div>
@@ -303,30 +320,52 @@
                     this.options = options;
                     this.visible = true;
                     this.listeners = {};
+                    this.infoWindow = null;
+                    
+                    // Predefined positions for each attraction to avoid random placement
+                    const positions = {
+                        'worth-avenue': { left: '25%', top: '35%' },
+                        'flagler-museum': { left: '30%', top: '25%' },
+                        'palm-beach-zoo': { left: '70%', top: '60%' },
+                        'science-center': { left: '65%', top: '40%' },
+                        'peanut-island': { left: '40%', top: '15%' },
+                        'breakers': { left: '20%', top: '30%' },
+                        'norton-museum': { left: '55%', top: '45%' },
+                        'lion-country-safari': { left: '80%', top: '70%' },
+                        'mounts-botanical-garden': { left: '60%', top: '75%' },
+                        'rapids-water-park': { left: '45%', top: '55%' }
+                    };
                     
                     // Create visual marker
                     const mockMarkers = document.getElementById('mockMarkers');
                     if (mockMarkers) {
                         const marker = document.createElement('div');
+                        const attractionId = this.getAttractionId(options.title);
+                        const position = positions[attractionId] || { left: '50%', top: '50%' };
+                        const markerColor = this.getMarkerColor(options.category);
+                        
                         marker.style.cssText = `
                             position: absolute;
-                            width: 30px;
-                            height: 30px;
-                            background: ${this.getMarkerColor(options.category)};
-                            border: 2px solid white;
+                            width: 35px;
+                            height: 35px;
+                            background: ${markerColor};
+                            border: 3px solid white;
                             border-radius: 50%;
                             cursor: pointer;
                             display: flex;
                             align-items: center;
                             justify-content: center;
-                            font-size: 14px;
-                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                            transition: all 0.3s;
-                            left: ${Math.random() * 85 + 5}%;
-                            top: ${Math.random() * 70 + 15}%;
+                            font-size: 16px;
+                            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+                            transition: all 0.3s ease;
+                            left: ${position.left};
+                            top: ${position.top};
+                            transform: translate(-50%, -50%);
+                            z-index: 5;
                         `;
-                        marker.innerHTML = options.icon?.emoji || '📍';
+                        marker.innerHTML = options.icon?.emoji || this.getCategoryEmoji(options.category);
                         marker.title = options.title;
+                        marker.setAttribute('data-category', options.category || 'all');
                         
                         marker.addEventListener('click', () => {
                             if (this.listeners.click) {
@@ -335,13 +374,15 @@
                         });
                         
                         marker.addEventListener('mouseenter', () => {
-                            marker.style.transform = 'scale(1.2)';
+                            marker.style.transform = 'translate(-50%, -50%) scale(1.15)';
                             marker.style.zIndex = '10';
+                            marker.style.boxShadow = '0 5px 20px rgba(0,0,0,0.4)';
                         });
                         
                         marker.addEventListener('mouseleave', () => {
-                            marker.style.transform = 'scale(1)';
-                            marker.style.zIndex = '1';
+                            marker.style.transform = 'translate(-50%, -50%) scale(1)';
+                            marker.style.zIndex = '5';
+                            marker.style.boxShadow = '0 3px 10px rgba(0,0,0,0.3)';
                         });
                         
                         mockMarkers.appendChild(marker);
@@ -364,15 +405,15 @@
                         infoWindow.style.cssText = `
                             position: absolute;
                             background: white;
-                            border-radius: 8px;
+                            border-radius: 12px;
                             padding: 15px;
-                            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-                            max-width: 250px;
+                            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+                            max-width: 280px;
                             z-index: 1000;
-                            border: 1px solid #e0e0e0;
+                            border: 2px solid #2D5016;
                             font-size: 14px;
-                            left: ${marker.element.offsetLeft + 35}px;
-                            top: ${marker.element.offsetTop}px;
+                            left: ${marker.element.offsetLeft + 40}px;
+                            top: ${marker.element.offsetTop - 10}px;
                         `;
                         infoWindow.innerHTML = this.options.content;
                         
@@ -380,14 +421,23 @@
                         closeBtn.innerHTML = '×';
                         closeBtn.style.cssText = `
                             position: absolute;
-                            top: 5px;
-                            right: 8px;
+                            top: 8px;
+                            right: 10px;
                             background: none;
                             border: none;
-                            font-size: 18px;
+                            font-size: 20px;
                             cursor: pointer;
                             color: #666;
+                            width: 25px;
+                            height: 25px;
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            transition: all 0.3s;
                         `;
+                        closeBtn.onmouseover = () => closeBtn.style.background = '#f0f0f0';
+                        closeBtn.onmouseout = () => closeBtn.style.background = 'none';
                         closeBtn.onclick = () => infoWindow.remove();
                         infoWindow.appendChild(closeBtn);
                         
@@ -417,11 +467,27 @@
                 }
             };
             
-            // Add marker color helper to prototype
+            // Add helper methods to Marker prototype
+            window.google.maps.Marker.prototype.getAttractionId = function(title) {
+                const titleMap = {
+                    'Worth Avenue Shopping': 'worth-avenue',
+                    'Flagler Museum': 'flagler-museum',
+                    'Palm Beach Zoo': 'palm-beach-zoo',
+                    'South Florida Science Center': 'science-center',
+                    'Peanut Island Park': 'peanut-island',
+                    'The Breakers Palm Beach': 'breakers',
+                    'Norton Museum of Art': 'norton-museum',
+                    'Lion Country Safari': 'lion-country-safari',
+                    'Mounts Botanical Garden': 'mounts-botanical-garden',
+                    'Rapids Water Park': 'rapids-water-park'
+                };
+                return titleMap[title] || 'unknown';
+            };
+            
             window.google.maps.Marker.prototype.getMarkerColor = function(category) {
                 const colors = {
                     shopping: '#FFD700',
-                    culture: '#8A2BE2', 
+                    culture: '#8A2BE2',
                     family: '#90EE90',
                     nature: '#20B2AA',
                     dining: '#DAA520',
@@ -430,13 +496,25 @@
                 return colors[category] || '#2D5016';
             };
             
+            window.google.maps.Marker.prototype.getCategoryEmoji = function(category) {
+                const emojis = {
+                    shopping: '🛍️',
+                    culture: '🏛️',
+                    family: '🎠',
+                    nature: '🌿',
+                    dining: '🍽️',
+                    adventure: '🎯'
+                };
+                return emojis[category] || '📍';
+            };
+
             window.google.maps.Marker.prototype.addListener = function(event, callback) {
                 if (!this.listeners[event]) this.listeners[event] = [];
                 this.listeners[event].push(callback);
             };
             
             window.google.maps.Marker.prototype.setMap = function(map) {
-                // Mock setMap functionality
+                this.map = map;
             };
             
             window.google.maps.Marker.prototype.setVisible = function(visible) {
@@ -448,10 +526,10 @@
             
             window.google.maps.Marker.prototype.setAnimation = function(animation) {
                 if (this.element && animation === 'bounce') {
-                    this.element.style.animation = 'bounce 1s ease';
+                    this.element.style.animation = 'markerBounce 0.6s ease-in-out';
                     setTimeout(() => {
                         if (this.element) this.element.style.animation = '';
-                    }, 1000);
+                    }, 600);
                 }
             };
             
@@ -462,10 +540,9 @@
             // Add bounce animation CSS
             const style = document.createElement('style');
             style.textContent = `
-                @keyframes bounce {
-                    0%, 20%, 60%, 100% { transform: translateY(0) scale(1); }
-                    40% { transform: translateY(-10px) scale(1.1); }
-                    80% { transform: translateY(-5px) scale(1.05); }
+                @keyframes markerBounce {
+                    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+                    50% { transform: translate(-50%, -50%) scale(1.2) translateY(-5px); }
                 }
             `;
             document.head.appendChild(style);
